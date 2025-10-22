@@ -23,7 +23,7 @@ with_telemetry Telemetry.Metrics do
       static_info = Keyword.get(opts, :static_info, %{})
       first_report_in = cast_time_to_ms(Keyword.fetch!(opts, :first_report_in))
       reporting_period = cast_time_to_ms(Keyword.fetch!(opts, :reporting_period))
-      reporter_fn = Keyword.get(opts, :reporter_fn, &report_home/1)
+      reporter_fn = Keyword.get(opts, :reporter_fn, &report_home/2)
       stack_id = Keyword.get(opts, :stack_id)
 
       GenServer.start_link(
@@ -41,12 +41,10 @@ with_telemetry Telemetry.Metrics do
       )
     end
 
-    def report_home(results) do
-      Req.post!(telemetry_url(), json: results, retry: :transient)
+    def report_home(telemetry_url, results) do
+      Req.post!(telemetry_url, json: results, retry: :transient)
       :ok
     end
-
-    defp telemetry_url, do: Electric.Config.get_env(:telemetry_url)
 
     def print_stats(name \\ __MODULE__) do
       GenServer.call(name, :print_stats)
@@ -78,7 +76,7 @@ with_telemetry Telemetry.Metrics do
       end
 
       Logger.notice(
-        "Starting telemetry reporter. Electric will send anonymous usage data to #{telemetry_url()}. " <>
+        "Starting telemetry reporter. Electric will send anonymous usage data to #{opts.telemetry_url}. " <>
           "You can configure this with `ELECTRIC_USAGE_REPORTING` environment variable, " <>
           "see https://electric-sql.com/docs/reference/telemetry for more information."
       )
@@ -123,6 +121,7 @@ with_telemetry Telemetry.Metrics do
 
       {:ok,
        Map.merge(context, %{
+         telemetry_url: opts.telemetry_url,
          handler_ids: handler_ids,
          summary_types: summary_types,
          all_paths: all_paths,
@@ -141,7 +140,7 @@ with_telemetry Telemetry.Metrics do
       end
 
       # On shutdown try to push all the data we still can.
-      state.reporter_fn.(build_report(state))
+      state.reporter_fn.(state.telemetry_url, build_report(state))
     end
 
     @empty_summary %{
@@ -163,7 +162,7 @@ with_telemetry Telemetry.Metrics do
 
       state =
         try do
-          :ok = state.reporter_fn.(full_report)
+          :ok = state.reporter_fn.(state.telemetry_url, full_report)
           clear_stats(%{state | last_reported: full_report.timestamp})
         rescue
           e ->
