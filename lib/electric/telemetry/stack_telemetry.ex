@@ -96,7 +96,7 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
       arch = :erlang.system_info(:system_architecture)
 
       %{
-        electric_version: to_string(Electric.version()),
+        electric_version: opts.version,
         environment: %{
           os: %{family: os_family, name: os_name},
           arch: to_string(arch),
