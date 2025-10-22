@@ -20,7 +20,6 @@ defmodule Electric.Telemetry.MixProject do
   defp deps do
     [
       {:otel_metric_exporter, "~> 0.3.11"},
-      {:postgrex, "~> 0.21"},
       {:req, "~> 0.5"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.1"},

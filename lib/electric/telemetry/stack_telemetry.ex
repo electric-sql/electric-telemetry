@@ -16,11 +16,7 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
     require Logger
 
     @opts_schema NimbleOptions.new!(
-                   Electric.Telemetry.Opts.schema() ++
-                     [
-                       stack_id: [type: :string, required: true],
-                       slot_name: [type: :string, required: true]
-                     ]
+                   [stack_id: [type: :string, required: true]] ++ Electric.Telemetry.Opts.schema()
                  )
 
     def start_link(opts) do
@@ -41,8 +37,11 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
       Electric.Telemetry.Sentry.set_tags_context(stack_id: opts.stack_id)
 
       [telemetry_poller_child_spec(opts) | exporter_child_specs(opts)]
+      |> Enum.reject(&is_nil/1)
       |> Supervisor.init(strategy: :one_for_one)
     end
+
+    defp telemetry_poller_child_spec(%{periodic_measurements: []} = _opts), do: nil
 
     defp telemetry_poller_child_spec(opts) do
       {:telemetry_poller,
@@ -272,79 +271,17 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
       ] ++ prometheus_metrics(opts)
     end
 
-    defp periodic_measurements(opts) do
-      [
-        {__MODULE__, :count_shapes, [opts.stack_id]},
-        {__MODULE__, :report_retained_wal_size, [opts.stack_id, opts.slot_name]}
-      ]
+    defp periodic_measurements(%{periodic_measurements: funcs} = opts) do
+      Enum.map(funcs, fn {m, f, a} when is_atom(m) and is_atom(f) and is_list(a) ->
+        {m, f, [opts | a]}
+      end)
     end
 
-    def count_shapes(stack_id) do
-      # Telemetry is started before everything else in the stack, so we need to handle
-      # the case where the shape cache is not started yet.
-      case Electric.ShapeCache.count_shapes(stack_id: stack_id) do
-        :error ->
-          :ok
-
-        num_shapes ->
-          Electric.Telemetry.OpenTelemetry.execute(
-            [:electric, :shapes, :total_shapes],
-            %{count: num_shapes},
-            %{stack_id: stack_id}
-          )
-      end
-    end
-
-    def for_stack(opts) do
+    defp for_stack(opts) do
       stack_id = opts.stack_id
 
       fn metadata ->
         metadata[:stack_id] == stack_id
-      end
-    end
-
-    @retained_wal_size_query """
-    SELECT
-      pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn)::int8
-    FROM
-      pg_replication_slots
-    WHERE
-      slot_name = $1
-    """
-
-    @doc false
-    @spec report_retained_wal_size(atom() | binary(), any()) :: :ok
-    def report_retained_wal_size(stack_id, slot_name) do
-      try do
-        %Postgrex.Result{rows: [[wal_size]]} =
-          Postgrex.query!(
-            Electric.Connection.Manager.admin_pool(stack_id),
-            @retained_wal_size_query,
-            [slot_name],
-            timeout: 3_000,
-            deadline: 3_000
-          )
-
-        # The query above can return `-1` which I'm assuming means "up-to-date".
-        # This is a confusing stat if we're measuring in bytes, so normalise to
-        # [0, :infinity)
-
-        Electric.Telemetry.OpenTelemetry.execute(
-          [:electric, :postgres, :replication],
-          %{wal_size: max(0, wal_size)},
-          %{stack_id: stack_id}
-        )
-      catch
-        :exit, {:noproc, _} ->
-          :ok
-
-        # catch all errors to not log them as errors, those are reporing issues at best
-        type, reason ->
-          Logger.warning(
-            "Failed to query retained WAL size\nError: #{Exception.format(type, reason)}",
-            stack_id: stack_id,
-            slot_name: slot_name
-          )
       end
     end
   end
