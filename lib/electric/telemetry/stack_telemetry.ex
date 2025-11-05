@@ -69,10 +69,14 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
        name: :"stack_otel_telemetry_#{opts.stack_id}",
        metrics: otel_metrics(opts),
        export_period: opts.otel_export_period,
-       resource: %{
-         stack_id: opts.stack_id,
-         instance: %{installation_id: Map.get(opts, :installation_id, "electric_default")}
-       }}
+       resource:
+         Map.merge(
+           %{
+             stack_id: opts.stack_id,
+             instance: %{installation_id: Map.get(opts, :installation_id, "electric_default")}
+           },
+           opts.otel_resource_attributes
+         )}
     end
 
     defp otel_reporter_child_spec(_), do: nil
@@ -222,6 +226,7 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
         last_value("electric.postgres.replication.wal_size", unit: :byte, keep: for_stack(opts)),
         last_value("electric.storage.used", unit: {:byte, :kilobyte}, keep: for_stack(opts)),
         last_value("electric.shapes.total_shapes.count", keep: for_stack(opts)),
+        last_value("electric.shapes.active_shapes.count", keep: for_stack(opts)),
         counter("electric.postgres.replication.transaction_received.count",
           keep: for_stack(opts)
         ),
@@ -236,7 +241,11 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
           keep: for_stack(opts)
         ),
         last_value("electric.connection.consumers_ready.total", keep: for_stack(opts)),
-        last_value("electric.connection.consumers_ready.failed_to_recover", keep: for_stack(opts))
+        last_value("electric.connection.consumers_ready.failed_to_recover",
+          keep: for_stack(opts)
+        ),
+        last_value("electric.admission_control.acquire.current", keep: for_stack(opts)),
+        sum("electric.admission_control.reject.count", keep: for_stack(opts))
       ]
     end
 

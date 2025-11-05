@@ -63,7 +63,14 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
     end
 
     defp otel_reporter_child_spec(%{otel_metrics?: true} = opts) do
-      {OtelMetricExporter, metrics: otel_metrics(opts), export_period: opts.otel_export_period}
+      {OtelMetricExporter,
+       metrics: otel_metrics(opts),
+       export_period: opts.otel_export_period,
+       resource:
+         Map.merge(
+           %{instance: %{installation_id: Map.get(opts, :installation_id, "electric_default")}},
+           opts.otel_resource_attributes
+         )}
     end
 
     defp otel_reporter_child_spec(_), do: nil
@@ -191,6 +198,7 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
         last_value("vm.reductions.total"),
         last_value("vm.reductions.delta"),
         last_value("vm.run_queue_lengths.total"),
+        last_value("vm.run_queue_lengths.total_plus_io"),
         last_value("vm.scheduler_utilization.total"),
         last_value("vm.scheduler_utilization.weighted"),
         last_value("vm.system_counts.atom_count"),
@@ -244,7 +252,7 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
 
     defp scheduler_ids do
       num_schedulers = :erlang.system_info(:schedulers)
-      Enum.map(1..num_schedulers, &:"normal_#{&1}") ++ [:cpu]
+      Enum.map(1..num_schedulers, &:"normal_#{&1}") ++ [:cpu, :io]
     end
 
     defp periodic_measurements(opts) do
@@ -346,12 +354,13 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
     end
 
     def run_queue_lengths(scheduler_ids) do
-      run_queue_lengths = :erlang.statistics(:run_queue_lengths)
+      run_queue_lengths = :erlang.statistics(:run_queue_lengths_all)
 
       measurements =
         Enum.zip(scheduler_ids, run_queue_lengths)
         |> Map.new()
         |> Map.put(:total, :erlang.statistics(:total_run_queue_lengths))
+        |> Map.put(:total_plus_io, :erlang.statistics(:total_run_queue_lengths_all))
 
       :telemetry.execute([:vm, :run_queue_lengths], measurements)
     end
