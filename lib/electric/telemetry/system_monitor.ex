@@ -21,7 +21,7 @@ defmodule Electric.Telemetry.SystemMonitor do
   @vm_monitor_long_message_queue [:vm, :monitor, :long_message_queue]
 
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    GenServer.start_link(__MODULE__, opts.intervals_and_thresholds, name: __MODULE__)
   end
 
   def init(opts) do

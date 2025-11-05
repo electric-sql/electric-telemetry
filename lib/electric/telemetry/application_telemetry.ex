@@ -9,7 +9,7 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
     """
     use Supervisor
 
-    import Telemetry.Metrics
+    alias Electric.Telemetry.Reporters
 
     require Logger
 
@@ -54,205 +54,19 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
 
     defp exporter_child_specs(opts) do
       [
-        statsd_reporter_child_spec(opts),
-        prometheus_reporter_child_spec(opts),
-        call_home_reporter_child_spec(opts),
-        otel_reporter_child_spec(opts)
+        Reporters.CallHomeReporter.child_spec(
+          opts,
+          metrics: Reporters.CallHomeReporter.application_metrics()
+        ),
+        Reporters.Otel.child_spec(opts,
+          metrics: Reporters.Otel.application_metrics()
+        ),
+        Reporters.Prometheus.child_spec(opts,
+          metrics: Reporters.Prometheus.application_metrics()
+        ),
+        Reporters.Statsd.child_spec(opts, metrics: Reporters.Statsd.application_metrics())
       ]
       |> Enum.reject(&is_nil/1)
-    end
-
-    defp otel_reporter_child_spec(%{otel_metrics?: true} = opts) do
-      {OtelMetricExporter,
-       metrics: otel_metrics(opts),
-       export_period: opts.otel_export_period,
-       resource:
-         Map.merge(
-           %{instance: %{installation_id: Map.get(opts, :installation_id, "electric_default")}},
-           opts.otel_resource_attributes
-         )}
-    end
-
-    defp otel_reporter_child_spec(_), do: nil
-
-    defp call_home_reporter_child_spec(%{call_home_telemetry?: true} = opts) do
-      {Electric.Telemetry.CallHomeReporter,
-       static_info: static_info(opts),
-       metrics: call_home_metrics(),
-       first_report_in: {2, :minute},
-       reporting_period: {30, :minute}}
-    end
-
-    defp call_home_reporter_child_spec(_), do: nil
-
-    defp static_info(opts) do
-      {total_mem, _, _} = :memsup.get_memory_data()
-      processors = :erlang.system_info(:logical_processors)
-      {os_family, os_name} = :os.type()
-      arch = :erlang.system_info(:system_architecture)
-
-      %{
-        electric_version: opts.version,
-        environment: %{
-          os: %{family: os_family, name: os_name},
-          arch: to_string(arch),
-          cores: processors,
-          ram: total_mem,
-          electric_instance_id: Map.fetch!(opts, :instance_id),
-          electric_installation_id: Map.get(opts, :installation_id, "electric_default")
-        }
-      }
-    end
-
-    # IMPORTANT: these metrics are validated on the receiver side, so if you change them,
-    #            make sure you also change the receiver
-    def call_home_metrics() do
-      [
-        resources: [
-          uptime:
-            last_value("vm.uptime.total",
-              unit: :second,
-              measurement: &:erlang.convert_time_unit(&1.total, :native, :second)
-            ),
-          used_memory: summary("vm.memory.total", unit: :byte),
-          run_queue_total: summary("vm.total_run_queue_lengths.total"),
-          run_queue_cpu: summary("vm.total_run_queue_lengths.cpu"),
-          run_queue_io: summary("vm.total_run_queue_lengths.io")
-        ],
-        system: [
-          load_avg1: last_value("system.load_percent.avg1"),
-          load_avg5: last_value("system.load_percent.avg5"),
-          load_avg15: last_value("system.load_percent.avg15"),
-          memory_free: last_value("system.memory.free_memory"),
-          memory_used: last_value("system.memory.used_memory"),
-          memory_free_percent: last_value("system.memory_percent.free_memory"),
-          memory_used_percent: last_value("system.memory_percent.used_memory"),
-          swap_free: last_value("system.swap.free"),
-          swap_used: last_value("system.swap.used"),
-          swap_free_percent: last_value("system.swap_percent.free"),
-          swap_used_percent: last_value("system.swap_percent.used")
-        ]
-      ]
-    end
-
-    defp statsd_reporter_child_spec(%{statsd_host: host} = opts) when host != nil do
-      {TelemetryMetricsStatsd,
-       host: host,
-       formatter: :datadog,
-       global_tags: [instance_id: opts.instance_id],
-       metrics: statsd_metrics()}
-    end
-
-    defp statsd_reporter_child_spec(_), do: nil
-
-    defp prometheus_reporter_child_spec(%{prometheus?: true}) do
-      {TelemetryMetricsPrometheus.Core, metrics: prometheus_metrics()}
-    end
-
-    defp prometheus_reporter_child_spec(_), do: nil
-
-    defp statsd_metrics() do
-      [
-        last_value("vm.memory.total", unit: :byte),
-        last_value("vm.memory.processes_used", unit: :byte),
-        last_value("vm.memory.binary", unit: :byte),
-        last_value("vm.memory.ets", unit: :byte),
-        last_value("vm.total_run_queue_lengths.total"),
-        last_value("vm.total_run_queue_lengths.cpu"),
-        last_value("vm.total_run_queue_lengths.io"),
-        last_value("system.load_percent.avg1"),
-        last_value("system.load_percent.avg5"),
-        last_value("system.load_percent.avg15"),
-        last_value("system.memory.free_memory"),
-        last_value("system.memory.used_memory"),
-        last_value("system.swap.free"),
-        last_value("system.swap.used")
-      ]
-      |> Enum.map(&%{&1 | tags: [:instance_id | &1.tags]})
-    end
-
-    defp prometheus_metrics do
-      num_schedulers = :erlang.system_info(:schedulers)
-      schedulers_range = 1..num_schedulers
-
-      num_dirty_cpu_schedulers = :erlang.system_info(:dirty_cpu_schedulers)
-
-      dirty_cpu_schedulers_range =
-        (num_schedulers + 1)..(num_schedulers + num_dirty_cpu_schedulers)
-
-      [
-        last_value("process.memory.total", tags: [:process_type], unit: :byte),
-        last_value("system.cpu.core_count"),
-        last_value("system.cpu.utilization.total"),
-        last_value("vm.garbage_collection.total_runs"),
-        last_value("vm.garbage_collection.total_bytes_reclaimed", unit: :byte),
-        last_value("vm.memory.atom", unit: :byte),
-        last_value("vm.memory.atom_used", unit: :byte),
-        last_value("vm.memory.binary", unit: :byte),
-        last_value("vm.memory.code", unit: :byte),
-        last_value("vm.memory.ets", unit: :byte),
-        last_value("vm.memory.processes", unit: :byte),
-        last_value("vm.memory.processes_used", unit: :byte),
-        last_value("vm.memory.system", unit: :byte),
-        last_value("vm.memory.total", unit: :byte),
-        last_value("vm.reductions.total"),
-        last_value("vm.reductions.delta"),
-        last_value("vm.run_queue_lengths.total"),
-        last_value("vm.run_queue_lengths.total_plus_io"),
-        last_value("vm.scheduler_utilization.total"),
-        last_value("vm.scheduler_utilization.weighted"),
-        last_value("vm.system_counts.atom_count"),
-        last_value("vm.system_counts.port_count"),
-        last_value("vm.system_counts.process_count"),
-        last_value("vm.total_run_queue_lengths.total"),
-        last_value("vm.total_run_queue_lengths.cpu"),
-        last_value("vm.total_run_queue_lengths.io"),
-        last_value("vm.uptime.total",
-          unit: :second,
-          measurement: &:erlang.convert_time_unit(&1.total, :native, :second)
-        )
-      ] ++
-        Enum.map(
-          # Add "system.cpu.utilization.core_*" but since there's no wildcard support we
-          # explicitly add the cores here.
-          0..(:erlang.system_info(:logical_processors) - 1),
-          &last_value("system.cpu.utilization.core_#{&1}")
-        ) ++
-        Enum.map(scheduler_ids(), &last_value("vm.run_queue_lengths.#{&1}")) ++
-        Enum.map(schedulers_range, &last_value("vm.scheduler_utilization.normal_#{&1}")) ++
-        Enum.map(dirty_cpu_schedulers_range, &last_value("vm.scheduler_utilization.cpu_#{&1}"))
-    end
-
-    defp otel_metrics(opts) do
-      [
-        last_value("system.load_percent.avg1"),
-        last_value("system.load_percent.avg5"),
-        last_value("system.load_percent.avg15"),
-        last_value("system.memory_percent.free_memory"),
-        last_value("system.memory_percent.available_memory"),
-        last_value("system.memory_percent.used_memory"),
-        sum("vm.monitor.long_message_queue.length", tags: [:process_type]),
-        distribution("vm.monitor.long_schedule.timeout",
-          tags: [:process_type],
-          unit: :millisecond
-        ),
-        distribution("vm.monitor.long_gc.timeout", tags: [:process_type], unit: :millisecond)
-      ] ++
-        prometheus_metrics() ++
-        memory_by_process_type_metrics(opts)
-    end
-
-    defp memory_by_process_type_metrics(%{otel_per_process_metrics?: true}) do
-      [
-        last_value("process.memory.total", tags: [:process_type], unit: :byte)
-      ]
-    end
-
-    defp memory_by_process_type_metrics(_), do: []
-
-    defp scheduler_ids do
-      num_schedulers = :erlang.system_info(:schedulers)
-      Enum.map(1..num_schedulers, &:"normal_#{&1}") ++ [:cpu, :io]
     end
 
     defp periodic_measurements(opts) do
@@ -273,7 +87,7 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
         {__MODULE__, :uptime_event, []},
         {__MODULE__, :cpu_utilization, []},
         {__MODULE__, :scheduler_utilization, []},
-        {__MODULE__, :run_queue_lengths, [scheduler_ids()]},
+        {__MODULE__, :run_queue_lengths, [Electric.Telemetry.scheduler_ids()]},
         {__MODULE__, :garbage_collection, [word_size]},
         {__MODULE__, :reductions, []},
         {__MODULE__, :process_memory, [opts]},

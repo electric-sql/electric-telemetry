@@ -37,4 +37,9 @@ defmodule Electric.Telemetry do
       if else_block, do: quote(do: unquote(else_block))
     end
   end
+
+  def scheduler_ids do
+    num_schedulers = :erlang.system_info(:schedulers)
+    Enum.map(1..num_schedulers, &:"normal_#{&1}") ++ [:cpu, :io]
+  end
 end
