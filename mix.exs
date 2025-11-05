@@ -19,11 +19,14 @@ defmodule Electric.Telemetry.MixProject do
 
   defp deps do
     [
+      # {:opentelemetry, "~> 1.7"},
+      # {:opentelemetry_exporter, "~> 1.9"},
       {:otel_metric_exporter, "~> 0.3.11"},
       {:req, "~> 0.5"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_metrics_prometheus_core, "~> 1.2"},
+      {:telemetry_metrics_statsd, "~> 0.7"},
       {:telemetry_poller, "~> 1.3"}
     ]
   end
