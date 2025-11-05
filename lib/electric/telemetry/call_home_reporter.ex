@@ -17,6 +17,15 @@ with_telemetry Telemetry.Metrics do
     @type metric :: Telemetry.Metrics.t()
     @type report_format :: keyword(metric() | report_format())
 
+    @opts_schema NimbleOptions.new!(
+                   name: [type: :atom],
+                   metrics: [type: :non_empty_keyword_list, required: true],
+                   first_report_in: [type: {:tuple, [:non_neg_integer, :atom]}],
+                   reporting_period: [type: {:tuple, [:non_neg_integer, :atom]}],
+                   static_info: [type: :map],
+                   telemetry_url: [type: :string, required: true]
+                 )
+
     def start_link(opts) do
       name = Keyword.get(opts, :name, __MODULE__)
       metrics = Keyword.fetch!(opts, :metrics)
@@ -39,6 +48,25 @@ with_telemetry Telemetry.Metrics do
         },
         name: name
       )
+    end
+
+    def static_info(opts) do
+      {total_mem, _, _} = :memsup.get_memory_data()
+      processors = :erlang.system_info(:logical_processors)
+      {os_family, os_name} = :os.type()
+      arch = :erlang.system_info(:system_architecture)
+
+      %{
+        electric_version: opts.version,
+        environment: %{
+          os: %{family: os_family, name: os_name},
+          arch: to_string(arch),
+          cores: processors,
+          ram: total_mem,
+          electric_instance_id: Map.fetch!(opts, :instance_id),
+          electric_installation_id: Map.fetch!(opts, :installation_id)
+        }
+      }
     end
 
     def report_home(telemetry_url, results) do
