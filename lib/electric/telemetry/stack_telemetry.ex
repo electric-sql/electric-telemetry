@@ -22,9 +22,9 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
                  )
 
     def start_link(opts) do
-      with {:ok, opts} <- NimbleOptions.validate(opts, @opts_schema) do
-        if telemetry_export_enabled?(Map.new(opts)) do
-          Supervisor.start_link(__MODULE__, Map.new(opts))
+      with {:ok, opts} <- Electric.Telemetry.validate_options(opts) do
+        if Electric.Telemetry.export_enabled?(opts) do
+          Supervisor.start_link(__MODULE__, opts)
         else
           # Avoid starting the telemetry supervisor and its telemetry_poller child if we're not
           # intending to export periodic measurements metrics anywhere.
@@ -33,27 +33,20 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
       end
     end
 
-    def init(opts) do
-      Process.set_label({:stack_telemetry_supervisor, opts.stack_id})
-      Logger.metadata(stack_id: opts.stack_id)
-      Electric.Telemetry.Sentry.set_tags_context(stack_id: opts.stack_id)
+    def init(%{stack_id: stack_id} = opts) do
+      Process.set_label({:stack_telemetry_supervisor, stack_id})
+      Logger.metadata(stack_id: stack_id)
+      Electric.Telemetry.Sentry.set_tags_context(stack_id: stack_id)
 
-      [telemetry_poller_child_spec(opts) | exporter_child_specs(opts)]
-      |> Enum.reject(&is_nil/1)
-      |> Supervisor.init(strategy: :one_for_one)
-    end
+      children =
+        [
+          {:telemetry_poller,
+           measurements: periodic_measurements(opts),
+           period: opts.intervals_and_thresholds.system_metrics_poll_interval,
+           init_delay: :timer.seconds(3)}
+        ] ++ exporter_child_specs(opts)
 
-    defp telemetry_poller_child_spec(%{periodic_measurements: []} = _opts), do: nil
-
-    defp telemetry_poller_child_spec(opts) do
-      {:telemetry_poller,
-       measurements: periodic_measurements(opts),
-       period: opts.system_metrics_poll_interval,
-       init_delay: :timer.seconds(3)}
-    end
-
-    defp telemetry_export_enabled?(opts) do
-      exporter_child_specs(opts) != []
+      Supervisor.init(children, strategy: :one_for_one)
     end
 
     defp exporter_child_specs(%{stack_id: stack_id} = opts) do
