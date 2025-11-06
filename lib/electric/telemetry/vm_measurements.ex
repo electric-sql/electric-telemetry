@@ -1,4 +1,6 @@
 defmodule Electric.Telemetry.VMMeasurements do
+  require Logger
+
   def periodic_measurements(opts) do
     word_size = :erlang.system_info(:wordsize)
 

@@ -26,6 +26,10 @@ defmodule Electric.Telemetry.Opts do
           long_message_queue_enable_threshold: [type: :integer, default: 1000],
           long_message_queue_disable_threshold: [type: :integer, default: 100]
         ]
+      ],
+      periodic_measurements: [
+        type: {:list, {:or, [{:in, [:builtin]}, :mfa]}},
+        required: false
       ]
     ]
   end

@@ -11,8 +11,6 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
 
     alias Electric.Telemetry.Reporters
 
-    require Logger
-
     def start_link(opts) do
       with {:ok, opts} <- Electric.Telemetry.validate_options(opts) do
         if Electric.Telemetry.export_enabled?(opts) do
@@ -55,7 +53,16 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
       |> Enum.reject(&is_nil/1)
     end
 
-    defp periodic_measurements(opts) do
+    def periodic_measurements(%{periodic_measurements: measurements} = telemetry_opts) do
+      Enum.flat_map(measurements, fn
+        :builtin -> builtin_periodic_measurements(telemetry_opts)
+        {m, f, a} when is_atom(m) and is_atom(f) and is_list(a) -> [{m, f, a}]
+      end)
+    end
+
+    def periodic_measurements(telemetry_opts), do: builtin_periodic_measurements(telemetry_opts)
+
+    def builtin_periodic_measurements(telemetry_opts) do
       [
         # Measurements included with the telemetry_poller application.
         #
@@ -66,7 +73,7 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
         :memory,
         :total_run_queue_lengths,
         :system_counts
-      ] ++ Electric.Telemetry.VMMeasurements.periodic_measurements(opts)
+      ] ++ Electric.Telemetry.VMMeasurements.periodic_measurements(telemetry_opts)
     end
   end
 end
