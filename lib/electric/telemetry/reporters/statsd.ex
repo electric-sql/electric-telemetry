@@ -21,26 +21,6 @@ defmodule Electric.Telemetry.Reporters.Statsd do
     )
   end
 
-  def application_metrics do
-    [
-      last_value("vm.memory.total", unit: :byte),
-      last_value("vm.memory.processes_used", unit: :byte),
-      last_value("vm.memory.binary", unit: :byte),
-      last_value("vm.memory.ets", unit: :byte),
-      last_value("vm.total_run_queue_lengths.total"),
-      last_value("vm.total_run_queue_lengths.cpu"),
-      last_value("vm.total_run_queue_lengths.io"),
-      last_value("system.load_percent.avg1"),
-      last_value("system.load_percent.avg5"),
-      last_value("system.load_percent.avg15"),
-      last_value("system.memory.free_memory"),
-      last_value("system.memory.used_memory"),
-      last_value("system.swap.free"),
-      last_value("system.swap.used")
-    ]
-    |> add_instance_id_tag()
-  end
-
   def stack_metrics(stack_id) do
     for_stack = fn metadata -> metadata[:stack_id] == stack_id end
 

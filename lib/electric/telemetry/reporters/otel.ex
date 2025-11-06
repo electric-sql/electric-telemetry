@@ -24,26 +24,6 @@ defmodule Electric.Telemetry.Reporters.Otel do
     )
   end
 
-  def application_metrics do
-    # TODO: externalize the Prometheus call
-    [
-      last_value("process.memory.total", tags: [:process_type], unit: :byte),
-      last_value("system.load_percent.avg1"),
-      last_value("system.load_percent.avg5"),
-      last_value("system.load_percent.avg15"),
-      last_value("system.memory_percent.free_memory"),
-      last_value("system.memory_percent.available_memory"),
-      last_value("system.memory_percent.used_memory"),
-      sum("vm.monitor.long_message_queue.length", tags: [:process_type]),
-      distribution("vm.monitor.long_schedule.timeout",
-        tags: [:process_type],
-        unit: :millisecond
-      ),
-      distribution("vm.monitor.long_gc.timeout", tags: [:process_type], unit: :millisecond)
-    ] ++
-      Electric.Telemetry.Reporters.Prometheus.application_metrics()
-  end
-
   def stack_metrics(stack_id) do
     for_stack = fn metadata -> metadata[:stack_id] == stack_id end
 

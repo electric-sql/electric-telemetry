@@ -88,6 +88,10 @@ defmodule Electric.Telemetry.VMMeasurements do
     :telemetry.execute([:vm, :scheduler_utilization], utilization)
   end
 
+  def run_queue_lengths do
+    run_queue_lengths(Electric.Telemetry.scheduler_ids())
+  end
+
   def run_queue_lengths(scheduler_ids) do
     run_queue_lengths = :erlang.statistics(:run_queue_lengths_all)
 
@@ -98,6 +102,10 @@ defmodule Electric.Telemetry.VMMeasurements do
       |> Map.put(:total_plus_io, :erlang.statistics(:total_run_queue_lengths_all))
 
     :telemetry.execute([:vm, :run_queue_lengths], measurements)
+  end
+
+  def garbage_collection do
+    garbage_collection(:erlang.system_info(:wordsize))
   end
 
   def garbage_collection(word_size) do
