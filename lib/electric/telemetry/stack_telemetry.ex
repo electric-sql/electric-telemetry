@@ -11,6 +11,8 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
     """
     use Supervisor
 
+    import Telemetry.Metrics
+
     alias Electric.Telemetry.Reporters
 
     require Logger
@@ -54,30 +56,107 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
       exporter_child_specs(opts) != []
     end
 
-    defp exporter_child_specs(opts) do
+    defp exporter_child_specs(%{stack_id: stack_id} = opts) do
+      metrics = metrics(opts)
+
       [
         Reporters.CallHomeReporter.child_spec(
           opts,
-          name: :"stack_call_home_telemetry_#{opts.stack_id}",
-          stack_id: opts.stack_id,
-          metrics: Reporters.CallHomeReporter.stack_metrics(opts.stack_id)
+          stack_id: stack_id,
+          name: :"stack_call_home_telemetry_#{stack_id}",
+          metrics: Reporters.CallHomeReporter.stack_metrics(stack_id)
         ),
         Reporters.Otel.child_spec(opts,
-          name: :"stack_otel_telemetry_#{opts.stack_id}",
-          metrics: Reporters.Otel.stack_metrics(opts.stack_id)
+          name: :"stack_otel_telemetry_#{stack_id}",
+          metrics: metrics
         ),
         Reporters.Prometheus.child_spec(opts,
-          name: :"stack_prometheus_telemetry_#{opts.stack_id}",
-          metrics: Reporters.Prometheus.stack_metrics(opts.stack_id)
+          name: :"stack_prometheus_telemetry_#{stack_id}",
+          metrics: metrics
         ),
-        Reporters.Statsd.child_spec(opts, metrics: Reporters.Statsd.stack_metrics(opts.stack_id))
+        Reporters.Statsd.child_spec(opts, metrics: statsd_metrics(opts.stack_id))
       ]
       |> Enum.reject(&is_nil/1)
     end
 
-    defp periodic_measurements(%{periodic_measurements: funcs} = opts) do
+    def periodic_measurements(%{periodic_measurements: funcs} = opts) do
       Enum.map(funcs, fn {m, f, a} when is_atom(m) and is_atom(f) and is_list(a) ->
         {m, f, [opts | a]}
+      end)
+    end
+
+    def metrics(telemetry_opts) do
+      [
+        distribution("electric.plug.serve_shape.duration",
+          unit: {:native, :millisecond},
+          keep: fn metadata -> metadata[:live] != true end
+        ),
+        distribution("electric.shape_cache.create_snapshot_task.stop.duration",
+          unit: {:native, :millisecond}
+        ),
+        distribution("electric.storage.make_new_snapshot.stop.duration",
+          unit: {:native, :millisecond}
+        ),
+        distribution("electric.postgres.replication.transaction_received.receive_lag",
+          unit: :millisecond
+        ),
+        distribution("electric.postgres.replication.transaction_received.operations"),
+        distribution("electric.storage.transaction_stored.replication_lag", unit: :millisecond),
+        last_value("electric.postgres.replication.wal_size", unit: :byte),
+        last_value("electric.storage.used", unit: {:byte, :kilobyte}),
+        last_value("electric.shapes.total_shapes.count"),
+        last_value("electric.shapes.active_shapes.count"),
+        counter("electric.postgres.replication.transaction_received.count"),
+        sum("electric.postgres.replication.transaction_received.bytes", unit: :byte),
+        sum("electric.storage.transaction_stored.bytes", unit: :byte),
+        last_value("electric.shape_monitor.active_reader_count"),
+        last_value("electric.connection.consumers_ready.duration",
+          unit: {:native, :millisecond}
+        ),
+        last_value("electric.connection.consumers_ready.total"),
+        last_value("electric.connection.consumers_ready.failed_to_recover"),
+        last_value("electric.admission_control.acquire.current"),
+        sum("electric.admission_control.reject.count")
+        | additional_metrics(telemetry_opts)
+      ]
+      |> keep_for_stack(telemetry_opts.stack_id)
+    end
+
+    def additional_metrics(%{additional_metrics: metrics}), do: metrics
+    def additional_metrics(_), do: []
+
+    def statsd_metrics(stack_id) do
+      [
+        summary("plug.router_dispatch.stop.duration",
+          tags: [:route],
+          unit: {:native, :millisecond}
+        ),
+        summary("plug.router_dispatch.exception.duration",
+          tags: [:route],
+          unit: {:native, :millisecond}
+        ),
+        summary("electric.shape_cache.create_snapshot_task.stop.duration",
+          unit: {:native, :millisecond}
+        ),
+        summary("electric.storage.make_new_snapshot.stop.duration",
+          unit: {:native, :millisecond}
+        ),
+        summary("electric.querying.stream_initial_data.stop.duration",
+          unit: {:native, :millisecond}
+        ),
+        last_value("electric.connection.consumers_ready.duration", unit: {:native, :millisecond}),
+        last_value("electric.connection.consumers_ready.total"),
+        last_value("electric.connection.consumers_ready.before_recovery")
+      ]
+      |> Electric.Telemetry.Reporters.Statsd.add_instance_id_tag()
+      |> keep_for_stack(stack_id)
+    end
+
+    defp keep_for_stack(metrics, stack_id) do
+      Enum.map(metrics, fn metric ->
+        Map.update!(metric, :keep, fn fun ->
+          fn metadata -> fun.(metadata) && metadata[:stack_id] == stack_id end
+        end)
       end)
     end
   end

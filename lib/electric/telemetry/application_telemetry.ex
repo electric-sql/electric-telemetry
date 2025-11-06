@@ -173,11 +173,7 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
         last_value("system.swap.free"),
         last_value("system.swap.used")
       ]
-      |> add_instance_id_tag()
-    end
-
-    defp add_instance_id_tag(metrics) do
-      Enum.map(metrics, fn metric -> Map.update!(metric, :tags, &[:instance_id | &1]) end)
+      |> Electric.Telemetry.Reporters.Statsd.add_instance_id_tag()
     end
   end
 end
