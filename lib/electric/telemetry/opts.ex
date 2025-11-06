@@ -30,6 +30,18 @@ defmodule Electric.Telemetry.Opts do
       periodic_measurements: [
         type: {:list, {:or, [{:in, [:builtin]}, :mfa]}},
         required: false
+      ],
+      addtional_metrics: [
+        type:
+          {:list,
+           {:or,
+            [
+              {:struct, Telemetry.Metrics.Counter},
+              {:struct, Telemetry.Metrics.LastValue},
+              {:struct, Telemetry.Metrics.Sum},
+              {:struct, Telemetry.Metrics.Summary},
+              {:struct, Telemetry.Metrics.Distribution}
+            ]}}
       ]
     ]
   end

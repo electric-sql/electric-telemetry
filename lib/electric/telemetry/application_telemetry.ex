@@ -39,13 +39,15 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
     end
 
     defp exporter_child_specs(opts) do
+      metrics = metrics(opts)
+
       [
         Reporters.CallHomeReporter.child_spec(
           opts,
           metrics: Reporters.CallHomeReporter.application_metrics()
         ),
-        Reporters.Otel.child_spec(opts, metrics: metrics()),
-        Reporters.Prometheus.child_spec(opts, metrics: metrics()),
+        Reporters.Otel.child_spec(opts, metrics: metrics),
+        Reporters.Prometheus.child_spec(opts, metrics: metrics),
         Reporters.Statsd.child_spec(opts, metrics: statsd_metrics())
       ]
       |> Enum.reject(&is_nil/1)
@@ -78,7 +80,7 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
       ] ++ Electric.Telemetry.VMMeasurements.periodic_measurements(telemetry_opts)
     end
 
-    def metrics do
+    def metrics(telemetry_opts) do
       [
         last_value("process.memory.total", tags: [:process_type], unit: :byte),
         last_value("system.cpu.core_count"),
@@ -125,7 +127,8 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
       ] ++
         cpu_utilization_metrics() ++
         scheduler_utilization_metrics() ++
-        run_queue_lengths_metrics()
+        run_queue_lengths_metrics() ++
+        additional_metrics(telemetry_opts)
     end
 
     def cpu_utilization_metrics do
@@ -149,6 +152,9 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
     def run_queue_lengths_metrics do
       Enum.map(Electric.Telemetry.scheduler_ids(), &last_value("vm.run_queue_lengths.#{&1}"))
     end
+
+    def additional_metrics(%{additional_metrics: metrics}), do: metrics
+    def additional_metrics(_), do: []
 
     def statsd_metrics do
       [
