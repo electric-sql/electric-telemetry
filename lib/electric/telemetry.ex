@@ -42,4 +42,25 @@ defmodule Electric.Telemetry do
     num_schedulers = :erlang.system_info(:schedulers)
     Enum.map(1..num_schedulers, &:"normal_#{&1}") ++ [:cpu, :io]
   end
+
+  @opts_schema NimbleOptions.new!(Electric.Telemetry.Opts.schema())
+
+  def validate_options(user_opts) do
+    with {:ok, validated_opts} <- NimbleOptions.validate(user_opts, @opts_schema) do
+      config =
+        Map.new(validated_opts, fn
+          {k, kwlist} when k in [:reporters, :intervals_and_thresholds] -> {k, Map.new(kwlist)}
+          kv -> kv
+        end)
+
+      {:ok, config}
+    end
+  end
+
+  def export_enabled?(%{reporters: reporters}) do
+    reporters.statsd_host ||
+      reporters.call_home_telemetry? ||
+      reporters.otel_metrics? ||
+      reporters.prometheus?
+  end
 end
