@@ -13,14 +13,15 @@ defmodule Electric.Telemetry.MixProject do
 
   def application do
     [
-      extra_applications: [:logger, :os_mon, :runtime_tools]
+      extra_applications: [:logger, :os_mon, :runtime_tools],
+      mod: {Electric.Telemetry.Application, []}
     ]
   end
 
   defp deps do
     [
       # {:opentelemetry, "~> 1.7"},
-      # {:opentelemetry_exporter, "~> 1.9"},
+      {:opentelemetry_exporter, "~> 1.9"},
       {:otel_metric_exporter, "~> 0.3.11"},
       {:req, "~> 0.5"},
       {:telemetry, "~> 1.3"},

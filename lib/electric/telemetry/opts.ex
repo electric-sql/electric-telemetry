@@ -11,7 +11,6 @@ defmodule Electric.Telemetry.Opts do
           call_home_telemetry?: [type: :boolean, default: false],
           otel_metrics?: [type: :boolean, default: false],
           prometheus?: [type: :boolean, default: false],
-          otel_export_period: [type: :integer, default: :timer.seconds(30)],
           otel_resource_attributes: [type: :map, default: %{}]
         ]
       ],
@@ -28,7 +27,10 @@ defmodule Electric.Telemetry.Opts do
         ]
       ],
       periodic_measurements: [
-        type: {:list, {:or, [{:in, [:builtin]}, :mfa]}},
+        type:
+          {:list,
+           {:or,
+            [{:in, [:builtin, :memory, :total_run_queue_lengths, :system_counts]}, :atom, :mfa]}},
         required: false
       ],
       addtional_metrics: [
@@ -42,6 +44,17 @@ defmodule Electric.Telemetry.Opts do
               {:struct, Telemetry.Metrics.Summary},
               {:struct, Telemetry.Metrics.Distribution}
             ]}}
+      ],
+      otel_opts: [
+        type: :keyword_list,
+        keys: [
+          otlp_protocol: [type: {:in, [:http_protobuf]}, default: :http_protobuf],
+          otlp_compression: [type: {:in, [:gzip]}, default: :gzip],
+          otlp_endpoint: [type: :string, required: true],
+          otlp_headers: [type: :map, default: %{}],
+          export_period: [type: :integer, default: :timer.seconds(30)],
+          resource: [type: :map, default: %{}]
+        ]
       ]
     ]
   end

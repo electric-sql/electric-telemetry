@@ -29,13 +29,25 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
       children =
         [
           {Electric.Telemetry.SystemMonitor, opts},
-          {:telemetry_poller,
-           measurements: periodic_measurements(opts),
-           period: opts.intervals_and_thresholds.system_metrics_poll_interval,
-           init_delay: :timer.seconds(5)}
-        ] ++ exporter_child_specs(opts)
+          telemetry_poller_child_spec(opts)
+          | exporter_child_specs(opts)
+        ]
+        |> Enum.reject(&is_nil/1)
 
       Supervisor.init(children, strategy: :one_for_one)
+    end
+
+    defp telemetry_poller_child_spec(opts) do
+      case periodic_measurements(opts) do
+        [] ->
+          nil
+
+        measurements ->
+          {:telemetry_poller,
+           measurements: measurements,
+           period: opts.intervals_and_thresholds.system_metrics_poll_interval,
+           init_delay: :timer.seconds(5)}
+      end
     end
 
     defp exporter_child_specs(opts) do
@@ -50,7 +62,6 @@ with_telemetry [Telemetry.Metrics, OtelMetricExporter] do
         Reporters.Prometheus.child_spec(opts, metrics: metrics),
         Reporters.Statsd.child_spec(opts, metrics: statsd_metrics())
       ]
-      |> Enum.reject(&is_nil/1)
     end
 
     def periodic_measurements(%{periodic_measurements: measurements} = telemetry_opts) do
