@@ -17,9 +17,7 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
 
     require Logger
 
-    @opts_schema NimbleOptions.new!(
-                   [stack_id: [type: :string, required: true]] ++ Electric.Telemetry.Opts.schema()
-                 )
+    @behaviour Electric.Telemetry.Poller
 
     def start_link(opts) do
       with {:ok, opts} <- Electric.Telemetry.validate_options(opts) do
@@ -33,6 +31,7 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
       end
     end
 
+    @impl Supervisor
     def init(%{stack_id: stack_id} = opts) do
       Process.set_label({:stack_telemetry_supervisor, stack_id})
       Logger.metadata(stack_id: stack_id)
@@ -40,11 +39,13 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
 
       children =
         [
-          {:telemetry_poller,
-           measurements: periodic_measurements(opts),
-           period: opts.intervals_and_thresholds.system_metrics_poll_interval,
-           init_delay: :timer.seconds(3)}
-        ] ++ exporter_child_specs(opts)
+          Electric.Telemetry.Poller.child_spec(opts,
+            callback_module: __MODULE__,
+            init_delay: :timer.seconds(3)
+          )
+          | exporter_child_specs(opts)
+        ]
+        |> Enum.reject(&is_nil/1)
 
       Supervisor.init(children, strategy: :one_for_one)
     end
@@ -69,14 +70,10 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
         ),
         Reporters.Statsd.child_spec(opts, metrics: statsd_metrics(opts.stack_id))
       ]
-      |> Enum.reject(&is_nil/1)
     end
 
-    def periodic_measurements(%{periodic_measurements: funcs} = opts) do
-      Enum.map(funcs, fn {m, f, a} when is_atom(m) and is_atom(f) and is_list(a) ->
-        {m, f, [opts | a]}
-      end)
-    end
+    @impl Electric.Telemetry.Poller
+    def builtin_periodic_measurements(_), do: []
 
     def metrics(telemetry_opts) do
       [

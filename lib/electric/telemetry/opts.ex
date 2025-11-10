@@ -3,6 +3,7 @@ defmodule Electric.Telemetry.Opts do
     [
       instance_id: [type: :string, required: true],
       installation_id: [type: :string],
+      stack_id: [type: :string],
       version: [type: :string, required: true],
       reporters: [
         type: :keyword_list,
@@ -30,7 +31,13 @@ defmodule Electric.Telemetry.Opts do
         type:
           {:list,
            {:or,
-            [{:in, [:builtin, :memory, :total_run_queue_lengths, :system_counts]}, :atom, :mfa]}},
+            [
+              {:in,
+               [:builtin, :memory, :persistent_term, :system_counts, :total_run_queue_lengths]},
+              :atom,
+              :mfa,
+              {:fun, 1}
+            ]}},
         required: false
       ],
       addtional_metrics: [
