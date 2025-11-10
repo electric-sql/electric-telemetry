@@ -8,6 +8,7 @@ defmodule Electric.Telemetry.Opts do
       version: [type: :string, required: true],
       reporters: [
         type: :keyword_list,
+        default: [],
         keys: [
           statsd_host: [type: {:or, [:string, nil]}, default: nil],
           call_home_telemetry?: [type: :boolean, default: false],
@@ -18,7 +19,6 @@ defmodule Electric.Telemetry.Opts do
       ],
       intervals_and_thresholds: [
         type: :keyword_list,
-        required: true,
         keys: [
           system_metrics_poll_interval: [type: :integer, default: :timer.seconds(5)],
           top_process_count: [type: :integer, default: 5],
