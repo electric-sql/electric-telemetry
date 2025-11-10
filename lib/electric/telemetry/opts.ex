@@ -4,6 +4,7 @@ defmodule Electric.Telemetry.Opts do
       instance_id: [type: :string, required: true],
       installation_id: [type: :string],
       stack_id: [type: :string],
+      call_home_url: [type: :string],
       version: [type: :string, required: true],
       reporters: [
         type: :keyword_list,

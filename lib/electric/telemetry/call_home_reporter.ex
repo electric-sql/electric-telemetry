@@ -17,14 +17,14 @@ with_telemetry Telemetry.Metrics do
     @type metric :: Telemetry.Metrics.t()
     @type report_format :: keyword(metric() | report_format())
 
-    @opts_schema NimbleOptions.new!(
-                   name: [type: :atom],
-                   metrics: [type: :non_empty_keyword_list, required: true],
-                   first_report_in: [type: {:tuple, [:non_neg_integer, :atom]}],
-                   reporting_period: [type: {:tuple, [:non_neg_integer, :atom]}],
-                   static_info: [type: :map],
-                   telemetry_url: [type: :string, required: true]
-                 )
+    # @opts_schema NimbleOptions.new!(
+    #                name: [type: :atom],
+    #                metrics: [type: :non_empty_keyword_list, required: true],
+    #                first_report_in: [type: {:tuple, [:non_neg_integer, :atom]}],
+    #                reporting_period: [type: {:tuple, [:non_neg_integer, :atom]}],
+    #                static_info: [type: :map],
+    #                telemetry_url: [type: :string, required: true]
+    #              )
 
     def start_link(opts) do
       name = Keyword.get(opts, :name, __MODULE__)
@@ -34,20 +34,20 @@ with_telemetry Telemetry.Metrics do
       reporting_period = cast_time_to_ms(Keyword.fetch!(opts, :reporting_period))
       reporter_fn = Keyword.get(opts, :reporter_fn, &report_home/2)
       stack_id = Keyword.get(opts, :stack_id)
+      telemetry_url = Keyword.fetch!(opts, :call_home_url)
 
-      GenServer.start_link(
-        __MODULE__,
-        %{
-          metrics: metrics,
-          first_report_in: first_report_in,
-          reporting_period: reporting_period,
-          name: name,
-          static_info: static_info,
-          reporter_fn: reporter_fn,
-          stack_id: stack_id
-        },
-        name: name
-      )
+      init_opts = %{
+        metrics: metrics,
+        first_report_in: first_report_in,
+        reporting_period: reporting_period,
+        name: name,
+        static_info: static_info,
+        reporter_fn: reporter_fn,
+        stack_id: stack_id,
+        telemetry_url: telemetry_url
+      }
+
+      GenServer.start_link(__MODULE__, init_opts, name: name)
     end
 
     def static_info(opts) do
