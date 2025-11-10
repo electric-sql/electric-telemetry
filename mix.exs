@@ -21,7 +21,11 @@ defmodule Electric.Telemetry.MixProject do
   defp deps do
     [
       {:opentelemetry_exporter, "~> 1.9"},
-      {:otel_metric_exporter, "~> 0.3.11"},
+      # {:otel_metric_exporter, "~> 0.3.11"},
+      # Temporarily use the latest `main` version of otel_metric_exporter for testing
+      {:otel_metric_exporter,
+       github: "electric-sql/elixir-otel-metric-exporter",
+       ref: "abad392a9b4c39109ab6989e2b9373c5d1403a2c"},
       {:req, "~> 0.5"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.1"},
