@@ -4,7 +4,7 @@ defmodule Electric.Telemetry.Opts do
       instance_id: [type: :string, required: true],
       installation_id: [type: :string],
       stack_id: [type: :string],
-      call_home_url: [type: :string],
+      call_home_url: [type: {:or, [:string, {:struct, URI}]}],
       version: [type: :string, required: true],
       reporters: [
         type: :keyword_list,
@@ -58,7 +58,9 @@ defmodule Electric.Telemetry.Opts do
         keys: [
           otlp_protocol: [type: {:in, [:http_protobuf]}, default: :http_protobuf],
           otlp_compression: [type: {:in, [:gzip]}, default: :gzip],
-          otlp_endpoint: [type: :string, required: true],
+          # The otlp_endpoint option is actually required but we rely on OtelMetricExporter
+          # fetching it from the app env if it's not passed explicitly.
+          otlp_endpoint: [type: :string],
           otlp_headers: [type: :map, default: %{}],
           export_period: [type: :integer, default: :timer.seconds(30)],
           resource: [type: :map, default: %{}]

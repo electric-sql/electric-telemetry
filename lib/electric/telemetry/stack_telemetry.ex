@@ -144,8 +144,9 @@ with_telemetry [OtelMetricExporter, Telemetry.Metrics] do
 
     defp keep_for_stack(metrics, stack_id) do
       Enum.map(metrics, fn metric ->
-        Map.update!(metric, :keep, fn fun ->
-          fn metadata -> fun.(metadata) && metadata[:stack_id] == stack_id end
+        Map.update!(metric, :keep, fn
+          nil -> fn metadata -> metadata[:stack_id] == stack_id end
+          fun -> fn metadata -> fun.(metadata) && metadata[:stack_id] == stack_id end
         end)
       end)
     end
