@@ -20,7 +20,7 @@ defmodule Electric.Telemetry.MixProject do
 
   defp deps do
     [
-      {:opentelemetry_exporter, "~> 1.9"},
+      # {:opentelemetry_exporter, "~> 1.9"},
       # {:otel_metric_exporter, "~> 0.3.11"},
       # Temporarily use the latest `main` version of otel_metric_exporter for testing
       {:otel_metric_exporter,
