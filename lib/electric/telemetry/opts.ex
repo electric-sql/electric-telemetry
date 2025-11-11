@@ -40,7 +40,7 @@ defmodule Electric.Telemetry.Opts do
             ]}},
         required: false
       ],
-      addtional_metrics: [
+      additional_metrics: [
         type:
           {:list,
            {:or,
