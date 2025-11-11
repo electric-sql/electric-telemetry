@@ -5,12 +5,8 @@ with_telemetry Telemetry.Metrics do
     def child_spec(telemetry_opts, reporter_opts) do
       if get_in(telemetry_opts, [:reporters, :otel_metrics?]) do
         otel_opts = Map.get(telemetry_opts, :otel_opts, [])
-
-        %{
-          id: __MODULE__,
-          start: {OtelMetricExporter, :start_link, [otel_opts ++ reporter_opts]},
-          type: :worker
-        }
+        start_opts = otel_opts ++ reporter_opts
+        {OtelMetricExporter, start_opts}
       end
     end
   end
