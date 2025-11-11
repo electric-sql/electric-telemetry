@@ -4,14 +4,13 @@ defmodule Electric.Telemetry.Opts do
       instance_id: [type: :string, required: true],
       installation_id: [type: :string],
       stack_id: [type: :string],
-      call_home_url: [type: {:or, [:string, {:struct, URI}]}],
       version: [type: :string, required: true],
       reporters: [
         type: :keyword_list,
         default: [],
         keys: [
           statsd_host: [type: {:or, [:string, nil]}, default: nil],
-          call_home_telemetry?: [type: :boolean, default: false],
+          call_home_url: [type: {:or, [:string, {:struct, URI}, nil]}, default: nil],
           otel_metrics?: [type: :boolean, default: false],
           prometheus?: [type: :boolean, default: false],
           otel_resource_attributes: [type: :map, default: %{}]

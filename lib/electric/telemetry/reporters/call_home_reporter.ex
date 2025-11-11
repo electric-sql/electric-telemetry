@@ -5,19 +5,20 @@ with_telemetry Telemetry.Metrics do
     import Telemetry.Metrics
 
     def child_spec(telemetry_opts, reporter_opts) do
-      if get_in(telemetry_opts, [:reporters, :call_home_telemetry?]) do
-        {__MODULE__, [static_info: static_info(telemetry_opts)] ++ reporter_opts}
+      if call_home_url = get_in(telemetry_opts, [:reporters, :call_home_url]) do
+        start_opts =
+          Keyword.merge(
+            [
+              static_info: static_info(telemetry_opts),
+              call_home_url: call_home_url,
+              first_report_in: {2, :minute},
+              reporting_period: {30, :minute}
+            ],
+            reporter_opts
+          )
+
+        {Electric.Telemetry.CallHomeReporter, start_opts}
       end
-    end
-
-    def start_link(opts) do
-      start_opts =
-        [
-          first_report_in: {2, :minute},
-          reporting_period: {30, :minute}
-        ] ++ opts
-
-      Electric.Telemetry.CallHomeReporter.start_link(start_opts)
     end
 
     # IMPORTANT: these metrics are validated on the receiver side, so if you change them,

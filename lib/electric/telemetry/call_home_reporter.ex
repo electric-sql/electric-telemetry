@@ -17,15 +17,6 @@ with_telemetry Telemetry.Metrics do
     @type metric :: Telemetry.Metrics.t()
     @type report_format :: keyword(metric() | report_format())
 
-    # @opts_schema NimbleOptions.new!(
-    #                name: [type: :atom],
-    #                metrics: [type: :non_empty_keyword_list, required: true],
-    #                first_report_in: [type: {:tuple, [:non_neg_integer, :atom]}],
-    #                reporting_period: [type: {:tuple, [:non_neg_integer, :atom]}],
-    #                static_info: [type: :map],
-    #                telemetry_url: [type: :string, required: true]
-    #              )
-
     def start_link(opts) do
       name = Keyword.get(opts, :name, __MODULE__)
       metrics = Keyword.fetch!(opts, :metrics)
